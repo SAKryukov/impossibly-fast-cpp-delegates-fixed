@@ -1,0 +1,4 @@
+<p class="author">Sergey A Kryukov</p>
+<p class="title">The Impossibly Fast C++ Delegates, Fixed</p>
+
+<p>Derived work based on the article by Sergey Ryazanov &ldquo;The Impossibly Fast C++ Delegates&rdquo;, 18 Jul 2005: this good solution is fixed and further developed using C++11.</p>

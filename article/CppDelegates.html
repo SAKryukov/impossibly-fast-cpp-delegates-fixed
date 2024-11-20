@@ -1,0 +1,215 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Style-Type" content="text/css" />
+  <meta name="generator" content="pandoc" />
+  <title></title>
+  <style type="text/css">code{white-space: pre;}</style>
+  <style type="text/css">
+  	th, h1, h2, h3, h4, h5, h6, p.title, p.author, ul { font-family: Verdana, sans-serif; }
+  	html, body { font-family: Cambria, serif; }
+  	ul { list-style: none; }
+  	p.title  { font-family: Verdana, sans-serif; font-size: 200%; text-align: center; }
+  	p.author { text-align: right; font-size: 110%; }
+  	table { width="100%"; margin-bottom: 2em; }
+  	td, th { padding-left: 1em; padding-right: 1em; padding-top: 0.4em; padding-bottom: 0.4em;}
+  	td, td, th, table { border: thin solid black; }
+  	th, pre { background-color: Wheat; }
+  	code { color: DarkRed; }
+  	pre, code, tt { font-family: Consolas, monospace; }
+  </style>
+</head>
+<body>
+<p class="author">Sergey A Kryukov</p>
+<p class="title">The Impossibly Fast C++ Delegates, Fixed</p>
+
+<p>Derived work based on the article by Sergey Ryazanov &ldquo;The Impossibly Fast C++ Delegates&rdquo;, 18 Jul 2005: this good solution is fixed and further developed using C++11.</p>
+<div id="TOC">
+<ul>
+<li><a href="#what-is-added">What is Added?</a></li>
+<li><a href="#usage-by-examples">Usage By Examples</a><ul>
+<li><a href="#multicast-delegate-usage">Multicast Delegate Usage</a></li>
+<li><a href="#multicast-invocation-with-return-object-handlers">Multicast Invocation with Return Object Handlers</a></li>
+</ul></li>
+<li><a href="#why-its-fast">Why it’s Fast?</a></li>
+<li><a href="#variadic-templates-and-parsing-of-template-parameters">Variadic Templates and Parsing of Template Parameters</a></li>
+<li><a href="#lambda-expressions">Lambda Expressions</a></li>
+<li><a href="#multicast-delegate">Multicast Delegate</a></li>
+<li><a href="#are-the-delegates-comparable">Are the Delegates Comparable?</a></li>
+<li><a href="#compatibility-and-build">Compatibility and Build</a></li>
+</ul>
+</div>
+<p>This is a derived work based on the ideas published by <a href="https://www.codeproject.com/Members/Sergey-Ryazanov">Sergey Ryazanov</a> in his article “<a href="https://www.codeproject.com/articles/11015/the-impossibly-fast-c-delegates">The Impossibly Fast C++ Delegates</a>”, 18 Jul 2005.</p>
+<p>I found the idea interesting, especially after reading the criticism in the discussion section. Even though the code and some approached do have certain problems, if not defeat the purpose of the delegates, at least partially, the idea of making the delegate very fast seems very fruitful, as well as the main technique. I hope I re-worked it into something really usable.</p>
+<h2 id="what-is-added">What is Added?</h2>
+<p>The code is written from scratch, based exclusively on the text of the original article where the idea is clearly expressed: the use of function stubs and filling the stub pointer from the template parameters of the factory methods. It is obvious that the types of the call parameters and the return type should be further abstracted out as template parameters. Naturally, it requires arbitrary number of parameters.</p>
+<p>So, as a first step, I added the generalization for the class templates based on C++/11 <a href="https://en.wikipedia.org/wiki/Variadic_template#C.2B.2B">variadic templates</a>, combined with <a href="https://en.wikipedia.org/wiki/Partial_template_specialization#Partial_specialization">partial template specialization</a>, to create what Sergey called “preferred syntax”, <code>&lt;RET(PARAMS…)&gt;</code>, completely eliminating all the preprocessor code.</p>
+<p>Notably, in general case, there are two levels of template and template instantiation: first, the delegate profile is instantiated by specifying the return and parameter types. On top of that, a desired <em>factory function</em> is instantiated by specifying the class type and its static or instance function. This way, the instantiation of a delegate profile and the target of invocation are carried apart in a near-optimal way.</p>
+<p>As to the <em>factory functions</em>, first thing to do was to note that the can be given the same name (<a href="https://www.codeproject.com/Articles/891455/Some-Programming-Approaches-to-Neuro-Linguistic-Pr#a3">so called</a> “overloading”), in my choice, “<code>create</code>”.</p>
+<p>I also added the practically important support of <a href="https://en.wikipedia.org/wiki/Anonymous_function#C.2B.2B_.28since_C.2B.2B11.29">lambda expressions</a> in the style similar to <code>std::function</code>. The delegate of the same time could be assigned to an instance of a lambda expression and called later. Importantly, the <a href="https://en.wikipedia.org/wiki/Closure_%28computer_programming%29">closure</a> <em>capture</em> performed by a lambda expression is preserved in the delegate instance.</p>
+<p>All of the above is covered by a single <code>delegate</code> template class. I also added one more template, <code>multicast delegate</code>, in .NET style.</p>
+<p>I also added <em>semantic</em> comparison between delegate instances of both types and comparison with null pointer, assignment operators giving the compiler the possibility to implicitly instantiate correspondent method templates through type <em>inference</em>, and similar small features.</p>
+<p>Notably, the instances of both delegate types can be created as “empty”. It reflects the main paradigm of the delegate usage, when the delegate instance is hosted by some class; and the code using the class sets or adds its own handlers in the course of this usage.</p>
+<p>Performance comparison was done with the use of <code>std::function</code>. In all cases where the time measurements might be considered as relatively valid (very roughly, starting from a hundred of delegate instances each called a hundred of times), the <code>delegate</code> type has shown superior performance compared with <code>std::function</code>. Roughly, depending on many factors, the gain in <code>delegate/std::function</code> creation time was from 10 to 60 times, and performance gain in the call operations was from 1.1 to 3 times. I performed the measurements on Windows in two platforms, x86 (IA-32) and x86-64, with <a href="http://clang.llvm.org">Clang</a>, <a href="https://gcc.gnu.org">GCC</a> and <a href="https://msdn.microsoft.com/en-us/library/60k1461a.aspx">Microsoft</a> compilers — see also <a href="#compatibility-and-build"> Compatibility and Build</a>.</p>
+<h2 id="usage-by-examples">Usage By Examples</h2>
+<pre>
+class Sample {
+public:
+    double InstanceFunction(int, char, const char*) { return 0.1; }
+    double ConstInstanceFunction(int, char, const char*) const { return 0.2; }
+    static double StaticFunction(int, char, const char*) { return 0.3; }
+}; //class Sample
+
+//...
+
+Sample sample;
+    
+delegate<double(int, char, const char*)> d;
+
+auto dInstance = decltype(d)::create<Sample, &Sample::InstanceFunction>(&sample);
+auto dConst = decltype(d)::create<Sample, &Sample::ConstInstanceFunction>(&sample);
+auto dFunc = decltype(d)::create<&Sample::StaticFunction>(); // same thing with non-class functions
+dInstance(0, 'A', "Instance method call");
+dConst(1, 'B', "Constant instance method call");
+dFunc(2, 'C', "Static function call");
+
+int touchPoint = 1;
+auto lambda = [&touchPoint](int i, char c, const char* msg) -> double {
+    std::cout << msg << std::endl;
+    // touch point is captured by ref, can change:
+    return (++touchPoint + (int)c) * 0.1 - i;
+}; //lambda
+
+decltype(d) dLambda = lambda; // lambda to delegate
+// or:
+//decltype(d) dLambda(lambda);
+
+if (d == nullptr) // true
+    d(1, '1', "lambda call"); //won't
+
+d = dLambda; // delegate to delegate
+
+if (d == dLambda) // true, and also d != nullptr
+    d(1, '1', "lambda call"); //will be called
+</pre>
+<p>By the way, compare this usage in the cases of class/struct instance function with the same thing using <code>std::function</code>:</p>
+<pre>
+//...
+
+Sample sample;  
+using namespace std::placeholders;
+std::function<double(double(int, char, const char*))> f
+    = std::bind(&Sample::InstanceFunction, &sample, _1);
+</pre>
+<p>The confusing part is the use of <code>std::placeholders</code> and <code>_1</code> (which is used to express the notion of the instance pointer passed as the first implicit parameter to the instance function call), which hardly looks obvious.</p>
+<h3 id="multicast-delegate-usage">Multicast Delegate Usage</h3>
+<pre>
+multicast_delegate<double(int, char, const char*)> md;
+multicast_delegate<double(int, char, const char*)> mdSecond;
+if (md == nullptr) // true
+    md(5, '6', "zero calls"); //won't
+// add some of the delegate instances:
+md += mdSecond; // nothing happens to md
+md += d; // invocation list: size=1
+md += dLambda; // invocation list: size=2
+if (md == dLambda) //false
+    std::cout << "md == dLambda" << std::endl;
+if (dLambda == md) //false
+    std::cout << "dLambda = md" << std::endl;
+if (md == mdSecond) //false
+    std::cout << "md == mdSecond" << std::endl;
+//adding lambda directly:
+md += lambda; // invocation list: size=3
+    md(7, '8', "call them all");
+</pre>
+<p>The above examples of multicast delegate usage discard the objects returned from each operation. All the code samples shown above can work with <code>void</code> return type. What to do with the return objects? They can be somehow accumulated; some of the values can be discarded, and so on. So, what solution would be the universal? It can be done by supplying a handler called on each return.</p>
+<h3 id="multicast-invocation-with-return-object-handlers">Multicast Invocation with Return Object Handlers</h3>
+<p>In addition to the <code>operator()</code>, the invocation with handling can be performed with a separate invocation template <code>operator()</code> with additional parameter — a handler for the returned objects:</p>
+<pre>
+double total = 0;
+md(9, 'a', "handling the return values:",
+    [&total](size_t index, double* ret) -> void {
+        std::cout << "\t"
+            << "index: "
+            << index
+            << "; returned: " << *ret
+            << std::endl;
+        total += *ret;
+});
+</pre>
+<p>Note that the handler shown here is the instance of the <code>delegate</code> template class created from a lambda expression. There is another form of the handler based on <code>std::function</code>. Interestingly, no function template instantiation is required, as the type of the handler can be <em>deduced</em> (<em>inferred</em>) by a compiler from the context.</p>
+<p>This code sample demonstrates the effect of enclosure capture used to accumulate the returned values in <code>total</code>. Of course, any other logic can be used; see also “DelegateDemo.h”.</p>
+<h2 id="why-its-fast">Why it’s Fast?</h2>
+<p>The basic idea is explained in the <a href="https://www.codeproject.com/articles/11015/the-impossibly-fast-c-delegates">article by S. Ryazanov</a>.</p>
+<p>The mechanism is fast because good part of work is delegated to the compile-time phase of the product life time.</p>
+<p>The delegate invocation call, <code>operator ()</code>, has only one level of indirection, a call to one of three <em>stub</em> functions (I added one more to support <em>lambda</em>). The address of an original method is not stored in the delegate class instance; instead, it is created during compile time, template instantiation. This way, each fragment of code creating an instance of a delegate based on a distinct function, instantiates a separate version of the stub. In each stub, the address of the function to be called is presented to the compiler as an <em>immediate constant</em>. Only one pointer is passed during run time: the pointer to the object used as “<code>this</code>” call argument (with the overhead of passing <code>nullptr</code> for static functions), which I later started to reuse as a pointer to a <em>lambda expression</em> instance, to support lambda.</p>
+<p>Important performance factor here is the absence of any runtime check which could be used to distinguish all four cases: instance function of a class, constant instance function of a class, static function and lambda expression. According to my brief and not very accurate research, such check would almost double the execution time related to the invocation mechanism overhead.</p>
+<h2 id="variadic-templates-and-parsing-of-template-parameters">Variadic Templates and Parsing of Template Parameters</h2>
+<p>This is the technique used to provide the structured function-like syntax for template parameters:</p>
+<pre>
+template <typename T> class delegate;
+
+template<typename RET, typename ...PARAMS>
+class delegate<RET(PARAMS...)> final : private delegate_base<RET(PARAMS...)> {
+    //...
+};
+</pre>
+<p>The specialization <code>delegate&lt;RET(PARAMS…)&gt;</code> creates the convenient profile for template instantiation, similar to the template <code>std::function</code>:</p>
+<pre>
+delegate<double(int, const string*)> del;
+delegate<void(double&)> byRefVoidDel;
+// ...and the like
+</pre>
+<h2 id="lambda-expressions">Lambda Expressions</h2>
+<p>The idea behind the lambda is to reuse the “<code>this</code>” pointer in the delegate instance data. In other cases, this pointer is used to hold the instance pointer of the class which instance method is used in the delegate, to pass it as the first (normally implicit) parameter of the method call.</p>
+<p>To perform the lambda expression call, I added one more stub function, <code>lambda_stub</code> (see “Delegate.h”):</p>
+<pre>
+template <typename LAMBDA>
+static RET lambda_stub(void* this_ptr, PARAMS... arg) {
+    LAMBDA* p = static_cast<LAMBDA*>(this_ptr);
+    return (p->operator())(arg...);
+} 
+</pre>
+<p>The reason for such solution is this is related to what I already explained <a href="#why-its-fast">above</a> — too expensive overhead of possible check of the different cases.</p>
+<p>In passing the lambda instance to the delegate instance, the most important problem is the support of the major lambda, closure capture. Notably, this feature is lost when a lambda instance is copied by value (if the capture set is not empty, the copy throws exception at its call). To me, such lambda design is questionable, but this is a standard behavior. Passing the instance by pointer created by the caller works, but this hardly could be a viable design, due to the need of dealing with null pointers. So, the only reasonable solution is to pass the lambda instance by constant reference and creation of the pointer inside the factory function.</p>
+<p>This is how the factory function looks:</p>
+<pre>
+template <typename LAMBDA>
+static delegate create(const LAMBDA & instance) {
+    return delegate((void*)(&instance), lambda_stub<LAMBDA>);
+}
+</pre>
+<p>This is the formal way to instantiate the template for this function:</p>
+<pre>
+auto d = delegate<double(int, char, const char*)>
+    ::create<decltype(lambda)>(lambda);
+</pre>
+<p>(See the declaration of <code>d</code> and <code>lambda</code> <a href="#usage">above</a>.)</p>
+<p>However, there is no a need to do it, because the lambda type will be deduced (inferred) by a compiler from the delegate type. So, it will work if <code>&lt;decltype(lambda)&gt;</code> is omitted from the code fragment shown above. Moreover, it could be done through the assignment operator defined for the <code>delegate</code> class:</p>
+<pre>
+delegate<double(int, char, const char*)> dl = lambda;
+</pre>
+<p>This is possible because of the template copy constructor and template assignment operator. Again, the template instantiation is not needed (and not possible for a constructor), because the template parameters are deduced (inferred) from delegate and lambda types.</p>
+<h2 id="multicast-delegate">Multicast Delegate</h2>
+<p>First of all, as multicast delegate represent the set of handlers in the form of <em>invocation list</em>, and the heap is used (this is the only piece of code where heap is used), much higher intrinsic performance cost of the list operation support and the list iteration totally absorbs fine performance detail of the list item call. And yet, the invocation list item holds the same pair of <code>this/stub</code> pointers as in <code>delegate</code>, not the pointer to a <code>delegate</code> instance.</p>
+<p>A <code>multicast_delegate</code> instance is created with an empty invocation list, which can be then populated with items using a set of “<code>+=</code>” operators from other instances of <code>multicast_delegate</code>, <code>delegate</code> and from lambda expressions of matching profiles. When existing list items used, they are cloned.</p>
+<h2 id="are-the-delegates-comparable">Are the Delegates Comparable?</h2>
+<p>Yes, they are, despite the statements made in <a href="https://www.codeproject.com/articles/11015/the-impossibly-fast-c-delegates">Sergey’s article</a>. “Comparison” is not a fully accurate term in this case; all the talking is actually about the <a href="https://en.wikipedia.org/wiki/Equality_%28mathematics%29"><em>equality</em> or <em>identity</em></a> relation. As soon as this is meant by “comparison”, delegates are “comparable” — please see the set of “<code>==</code>” and “<code>!=</code>” operators. Several operators represent all cases of equality checks: each of the classes <code>delegate</code> and <code>multicast_delegate</code> can be equal or not equal to the instance of its own or another type, additionally, an instance of each type can be equal or not equal to <code>nullptr</code>. Taking into account <em>commutativity</em>, it gives 12 cases. For all of the purposes of such relation, this is a perfectly valid set of operators.</p>
+<p><a href="https://www.codeproject.com/Members/Sergey-Ryazanov">Sergey</a> argued that “a delegate doesn’t contain a pointer to method”. But why? It actually <em>does</em> contain such pointer, only this pointer is not passed to a delegate instance during run time. Instead, all the template instantiations generate the all the method addresses in the form of <em>immediate constants</em>, so the comparison of such pointers is done correctly but indirectly, through the comparison of different stubs. If two stub pointers are different, it always means that underlying function pointers are different, and visa versa.</p>
+<p>Two delegate instances created from the same function or the same class and same “<code>this</code>” pointer compare as identical. The same goes with the delegate instances created from some lambda expression instance. If, by some reason, someone manages to compile some fragment of source code independently in different compilation units and make those units link together successfully, it yields <em>different</em> classes and function pointers, not the same. Likewise, two separate lambda expressions in the same stack frame with identical code still produce two different types, which can be easily checked up; and this is done for a reason. In both cases, the delegate instances instantiated from these <em>not-really-identical</em> objects simply <em>must</em> compare as <em>not</em> identical.</p>
+<p>After all, the set of “<code>==</code>” and “<code>!=</code>” operators defines the relationship on the set of delegate instances which matches the definition of <a href="https://en.wikipedia.org/wiki/Equivalence_relation">equivalence relation</a>: it is <em>reflective</em>, <em>symmetric</em> (<em>commutative</em>) and <em>transitive</em> — all that matters.</p>
+<h2 id="compatibility-and-build">Compatibility and Build</h2>
+<p>All the <code>delegate/multicast_delegate</code> solution is contained in just three files:</p>
+<ul>
+<li>“DelegateBase.h”,</li>
+<li>“Delegate.h”,</li>
+<li>“MultiCastDelegate.h”;</li>
+</ul>
+<p>they include each other in the given order and can be added to any project.</p>
+<p>The compiler should support <a href="https://en.wikipedia.org/wiki/C%2B%2B11">C++11</a> or later standard. For GCC, this is an option which should be set to <code>-std=c++11</code> or, say, <code>-std=c++14</code>.</p>
+<p>The demo and benchmark project is provided in two forms: 1) Visual Studio 2015 solution and project using Microsoft C++ compiler and <a href="http://clang.llvm.org">Clang</a> — see “CppDelegates.sln” and 2) <a href="http://www.codeblocks.org">Code::Blocks</a> project using <a href="https://gcc.gnu.org">GCC</a> — “ CPPDelegates.cbp”. For all other options, one can assemble a project or a make file by adding all “*.h” and “*.cpp” files in the code directory “CppDelegates”.</p>
+<p>I tested the code with Visual Studio 2015, <a href="http://clang.llvm.org">Clang</a> 4.0.0, <a href="https://gcc.gnu.org">GCC</a> 5.1.0.</p>
+<p>The C++ options included “disable language extensions” (<code>/Za</code> for Microsoft and Clang), which seems to be essential for Microsoft. However, with this option, one weird Microsoft problem is the failure to compile “<code>//</code>” comments at the end of a file; the problem can be solved, for example, by adding an empty line at the end of the file; I set up a “Microsoft guard” in the form of “<code>/* … */</code>” at the end of each file.</p>
+</body>
+</html>

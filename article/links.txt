@@ -1,0 +1,25 @@
+"The Impossibly Fast C++ Delegates", 18 Jul 2005
+https://www.codeproject.com/articles/11015/the-impossibly-fast-c-delegates
+
+Also:
+https://www.codeproject.com/Articles/13287/Fast-C-Delegate (almost plagiarizm) =>
+	http://www.tutok.sk/fastgl/callback.html
+	https://www.codeproject.com/cpp/FastDelegate.asp
+	https://www.codeproject.com/Articles/7150/Member-Function-Pointers-and-the-Fastest-Possible (Don Clugston)
+	https://www.codeproject.com/Articles/10650/Yet-Another-Generalized-Functors-Implementation-in (Trunov)
+
+		=>
+		https://sourceforge.net/projects/loki-lib (idioms in general)
+		
+		
+
+Comparison with C++/11:
+https://www.codeproject.com/articles/11015/the-impossibly-fast-c-delegates
+
+http://www.cprogramming.com/c++11/c++11-lambda-closures.html
+
+Lambda to function ptr (like std::function); see 
+http://stackoverflow.com/questions/28746744/passing-lambda-as-function-pointer
+
+C++ criticism:
+http://yosefk.com/c++fqa/web-vs-c++.html

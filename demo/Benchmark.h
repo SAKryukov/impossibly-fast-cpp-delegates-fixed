@@ -1,5 +1,7 @@
 #pragma once
-#include "stdafx.h"
+#include "../src/DelegateBase.h"
+#include "../src/Delegate.h"
+#include "../src/MultiCastDelegate.h"
 
 typedef uint64_t ns;
 typedef uint32_t rep;
